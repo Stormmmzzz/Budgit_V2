@@ -1,4 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* Nexa Pro variable fonts supplied with this project.
+   The supplied font package is marked Demo / Trial; check its licence before commercial distribution. */
+@font-face {
+  font-family: 'Nexa Pro';
+  src: url('./fonts/NexaPro-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nexa Pro';
+  src: url('./fonts/NexaPro-Variable-Italic.ttf') format('truetype');
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nexa Text Pro';
+  src: url('./fonts/NexaTextPro-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nexa Text Pro';
+  src: url('./fonts/NexaTextPro-Variable-Italic.ttf') format('truetype');
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
 
 :root {
   --bg: #f5f6f8;
@@ -39,7 +68,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-family: 'Nexa Text Pro', 'Nexa Pro', -apple-system, system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -1222,3 +1251,91 @@ body { font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 .logo-preview { width:54px; height:54px; object-fit:cover; border-radius:14px; margin-top:10px; }
 .modal-copy { color:var(--text2); font-size:13px; line-height:1.5; margin:10px 0 18px; }
 @media (min-width:700px) { .app { box-shadow:0 0 0 1px rgba(0,0,0,.025); } }
+
+/* Budgit polish pass: Nexa Pro first, with a safe fallback if its licensed font files aren't installed. */
+@font-face { font-family: 'Nexa Pro'; src: local('Nexa Pro'), local('NexaPro-Regular'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Nexa Pro'; src: local('Nexa Pro Bold'), local('NexaPro-Bold'); font-style: normal; font-weight: 700 900; font-display: swap; }
+:root { --accent:#69d620; --accent-light:#eaf8e1; --accent-dark:#4ca817; --lime:#69d620; --lime-pale:#f3fbea; --success:#69d620; --focus-ring:rgba(105,214,32,.22); }
+body, button, input, select, textarea { font-family:'Nexa Pro', 'NexaPro', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.btn-primary,.fab { background:#69d620; color:#17220f; }
+.btn-primary:hover,.fab:hover { background:#5ec51a; }
+.form-input:focus,.search-bar input:focus { border-color:#69d620; box-shadow:0 0 0 3px var(--focus-ring); }
+.logo-choice.selected { border-color:#69d620; box-shadow:inset 0 0 0 1px #69d620; }
+.decide-hero { background:#202020 !important; color:#fff !important; border:1px solid #202020; }
+.decide-hero p { color:#d0d0d0; }
+.decide-hero .decide-btn { background:#69d620; color:#171717; }
+/* Dark mode covers every shared surface, controls, navigation and overlays rather than only changing the page background. */
+[data-theme="dark"] { color-scheme:dark; --bg:#101110; --card:#1a1c19; --text:#f4f5f2; --text2:#b4b8b0; --text3:#858b80; --accent:#69d620; --accent-light:#293c20; --accent-dark:#86e64c; --lime:#293c20; --lime-pale:#202a1b; --border:#30342e; --shadow:0 1px 3px rgba(0,0,0,.22); --shadow-md:0 8px 28px rgba(0,0,0,.3); }
+[data-theme="dark"] body,[data-theme="dark"] .app,[data-theme="dark"] .page { background:var(--bg); color:var(--text); }
+[data-theme="dark"] .overview-card,[data-theme="dark"] .insight-card,[data-theme="dark"] .payment-card,[data-theme="dark"] .tx-item,[data-theme="dark"] .sub-item,[data-theme="dark"] .month-chip,[data-theme="dark"] .settings-item,[data-theme="dark"] .modal,[data-theme="dark"] .detail-body,[data-theme="dark"] .detail-header,[data-theme="dark"] .bottom-nav,[data-theme="dark"] .list-popup-content { background:var(--card) !important; color:var(--text); border-color:var(--border); }
+[data-theme="dark"] .form-input,[data-theme="dark"] .search-bar input,[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea { background:#222520; color:var(--text); border-color:var(--border); }
+[data-theme="dark"] .form-input::placeholder,[data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder { color:var(--text3); }
+[data-theme="dark"] .settings-icon,[data-theme="dark"] .file-ic,[data-theme="dark"] .cal { background:#252a22; color:var(--accent); }
+[data-theme="dark"] .btn-secondary,[data-theme="dark"] .logo-choice { background:#242722; color:var(--text); border-color:var(--border); }
+[data-theme="dark"] .nav-item.active { background:var(--accent-light); border-radius:14px; }
+[data-theme="dark"] .nav-item.active svg,[data-theme="dark"] .nav-item.active .nav-label { color:var(--accent); }
+[data-theme="dark"] .decide-hero { background:#080908 !important; border-color:#30342e; }
+[data-theme="dark"] .savings-intro,[data-theme="dark"] .savings-goal-card,[data-theme="dark"] .savings-checkin,[data-theme="dark"] .savings-empty { background:var(--card); border-color:var(--border); }
+[data-theme="dark"] .goal-progress { background:#343a30; }
+[data-theme="dark"] .logo-preview { border:1px solid var(--border); }
+/* Subscription brand tiles and a preview that reflects the selection before saving. */
+.logo-choice .brand-mark { display:flex; align-items:center; justify-content:center; min-width:30px; min-height:30px; border-radius:9px; padding:2px 5px; }
+.logo-spotify .brand-mark { background:#1db954; color:#fff; border-radius:50%; }
+.logo-netflix .brand-mark { background:#e50914; color:#fff; font-family:Arial,sans-serif; }
+.logo-youtube .brand-mark { background:#fff; color:#f00; }
+.logo-mcdonalds .brand-mark { background:#ffc72c; color:#da291c; }
+.logo-apple .brand-mark { background:#202020; color:#fff; }
+.logo-disney .brand-mark { background:#101a4b; color:#fff; }
+.logo-prime .brand-mark { background:#00a8e0; color:#fff; font-size:12px; }
+.selected-logo-preview { display:flex; align-items:center; gap:10px; margin:10px 0 14px; color:var(--text2); font-size:12px; }
+.selected-logo-preview .sub-logo { width:48px; height:48px; flex-shrink:0; }
+/* Savings tracker */
+.savings-intro { display:flex; align-items:center; gap:14px; margin:10px 20px 14px; padding:18px; border-radius:18px; background:#f0f2ef; }
+.savings-intro-icon { width:44px; height:44px; display:grid; place-items:center; flex-shrink:0; border-radius:14px; background:#69d620; color:#17220f; font-size:28px; font-weight:800; }
+.savings-intro h2 { font-size:16px; margin-bottom:4px; }
+.savings-intro p { color:var(--text2); font-size:12px; line-height:1.5; }
+.savings-actions { display:flex; gap:8px; margin:0 20px 18px; }
+.savings-actions .btn { flex:1; font-size:12px; padding:12px 8px; }
+.savings-goals { display:flex; flex-direction:column; gap:12px; }
+.savings-goal-card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:16px; }
+.savings-goal-top { display:flex; align-items:center; gap:10px; }
+.goal-symbol { width:40px; height:40px; display:grid; place-items:center; background:var(--accent-light); color:var(--accent-dark); border-radius:13px; font-size:23px; }
+.savings-goal-title { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.savings-goal-title strong { font-size:14px; overflow-wrap:anywhere; }
+.savings-goal-title span { color:var(--text2); font-size:11px; }
+.text-icon-btn { border:0; background:transparent; color:var(--text2); padding:8px; border-radius:9px; cursor:pointer; }
+.goal-amount-row { display:flex; align-items:baseline; gap:5px; margin:16px 0 8px; }
+.goal-amount-row strong { font-size:24px; letter-spacing:-.04em; }
+.goal-amount-row span { color:var(--text2); font-size:12px; }
+.goal-progress { height:7px; border-radius:20px; overflow:hidden; background:#ecefe9; }
+.goal-progress span { display:block; height:100%; border-radius:20px; background:#69d620; transition:width .25s ease; }
+.goal-guidance { margin-top:10px; color:var(--text2); font-size:11px; line-height:1.55; }
+.goal-card-actions { display:flex; align-items:center; gap:7px; margin-top:13px; }
+.goal-card-actions .btn { flex:1; min-width:0; padding:9px 5px; font-size:11px; }
+.danger-text { color:var(--danger); }
+.savings-empty { text-align:center; background:var(--card); border:1px dashed var(--border); border-radius:18px; padding:28px 18px; }
+.savings-empty-icon { font-size:34px; color:var(--accent); margin-bottom:8px; }
+.savings-empty strong { font-size:14px; }
+.savings-empty p { margin:6px auto 0; max-width:250px; font-size:12px; color:var(--text2); line-height:1.5; }
+.savings-checkin { margin:0 20px 16px; padding:16px; border:1px solid var(--border); border-radius:16px; background:var(--accent-light); }
+.savings-checkin strong { font-size:14px; }
+.savings-checkin p { font-size:12px; color:var(--text2); line-height:1.6; margin:8px 0; }
+.savings-checkin .btn { width:100%; margin-top:7px; font-size:12px; }
+.savings-activity { display:flex; flex-direction:column; }
+.savings-activity-row { display:flex; align-items:center; gap:10px; padding:12px 2px; border-bottom:1px solid var(--border); }
+.activity-dot { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; font-size:18px; font-weight:800; }
+.activity-dot.saved { color:#348c12; background:#e8f8df; }
+.activity-dot.spent { color:#d34b4b; background:#fdeaea; }
+.activity-copy { flex:1; display:flex; flex-direction:column; gap:3px; }
+.activity-copy strong { font-size:12px; }
+.activity-copy span { color:var(--text2); font-size:10px; }
+.savings-activity-row > strong { font-size:13px; }
+.saved-text { color:#69d620; }.spent-text { color:var(--danger); }
+@media(max-width:390px){.savings-actions{flex-direction:column}.goal-card-actions{flex-wrap:wrap}.goal-card-actions .btn{flex:1 1 30%}}
+
+
+/* Nexa Pro display typography */
+h1, h2, h3, h4, .greeting-name, .section-title, .page-title,
+.card-title, .amount, .balance-amount, .stat-value, .nav-label {
+  font-family: 'Nexa Pro', 'Nexa Text Pro', sans-serif;
+}
