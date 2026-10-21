@@ -1,33 +1,28 @@
-Budgit — minimalist subscription and savings tracker
+BUDGIT - UPDATED PROJECT
 
-Files
+Files:
 - index.html: app structure
-- script.js: app logic and local data
-- sty.css: styling and responsive layout
+- script.js: application logic
+- sty.css: styling
+- fonts/: local Nexa Pro font files
 
-Run
-1. Extract this folder.
-2. Open index.html directly, or use VS Code Live Server.
-3. Data is stored locally in this browser. Back up your browser data before clearing site storage.
+Run locally:
+1. Extract the complete project folder.
+2. Keep index.html, script.js, sty.css, and fonts/ together.
+3. Open index.html with VS Code Live Server for best results.
 
-Features in this update
-- Minimalist UI with a darker #69d620 green accent and a black Decide hero.
-- Subscription logos: preset brand marks, uploaded images, and a live selection preview. Uploaded images are stored in browser local storage as compressed data URLs.
-- Savings goals and repeating savings habits; log saved/spent amounts any time; check-in prompts can run while the app is open at the selected time.
-- Daily/weekly/monthly savings guidance for goals with a target date.
-- Dark theme colors across cards, forms, navigation, and modals.
-- Settings credit: Created by Stephan Ngenda.
+Updates in this version:
+- Savings goal creation is split into focused popup steps.
+- Target date uses the browser calendar date picker.
+- Check-in time uses a custom-styled hour/minute selector.
+- Savings check-ins use an in-app modal with Yes/No and amount entry, not browser confirm/prompt dialogs.
+- Insights includes a monthly budget overview and subscription evaluator.
+- Subscription details includes an evaluator action.
+- Choosing “Save for it” when completing a Decide assessment creates a linked savings goal.
+- Budget label says “Money available”.
 
-Font note
-The stylesheet requests Nexa Pro by local font name. Nexa Pro is a licensed font and is not bundled. Install the licensed Nexa Pro font on the device, or provide the licensed .woff2/.woff font files and add them to the project to guarantee the exact typeface across devices.
-
-Currency note
-Subscription prices retain their original currency and totals convert into the selected default currency using Frankfurter exchange rates when available. Internet access is needed for fresh rates.
-
-Reminder note
-Browser timers only run while the app tab is open. The savings check-in will not pop up when the browser is fully closed.
-
-
-NEXA PRO FONT
-The Nexa Pro and Nexa Text Pro variable font files are included in ./fonts and loaded locally by sty.css, so no Google Fonts connection is required.
-The supplied font archive identifies the fonts as Demo / Trial. Review its licensing terms and obtain a suitable licence before commercial distribution.
+Notes:
+- Exchange rates require internet access. When rates cannot be retrieved, cross-currency totals may be unavailable rather than silently treating currencies as equal.
+- Reminder popups work while the app is open. Browser tabs that are fully closed cannot show in-app reminders.
+- Please test the new workflows in a browser before replacing your working copy. Back up your current data first.
+- Ensure your font files are used according to their licence.
