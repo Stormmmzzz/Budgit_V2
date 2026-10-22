@@ -13,12 +13,12 @@ Run locally:
 
 Updates in this version:
 - Savings goal creation is split into focused popup steps.
-- Target date uses the browser calendar date picker.
-- Check-in time uses a custom-styled hour/minute selector.
-- Savings check-ins use an in-app modal with Yes/No and amount entry, not browser confirm/prompt dialogs.
+- Savings target dates and entry dates use Budgit's own in-app calendar (same one as the subscription renewal step), not the browser's.
+- Check-in time is chosen on an in-app analog clock: tap or drag the hour, then the minute.
+- Savings check-ins appear as a dimmed full-screen popup on whichever tab you are on when the reminder time is reached (while Budgit is open), with a 10-minute snooze.
 - Insights includes a monthly budget overview and subscription evaluator.
 - Subscription details includes an evaluator action.
-- Choosing “Save for it” when completing a Decide assessment creates a linked savings goal.
+- Choosing “Save for it” (or starting a timer on a “Save for this purchase” result) creates a linked savings goal. Existing assessments already marked Saving are added automatically.
 - Budget label says “Money available”.
 
 Notes:

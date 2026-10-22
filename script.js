@@ -211,9 +211,10 @@ function renewalsIn(sub, year, month) {
 // ============ CALENDAR PICKER ============
 const CAL = {};
 const CAL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-function calendar(id, value, cb) {
+function calendar(id, value, cb, opts) {
   const v = value ? parseISO(value) : new Date();
-  CAL[id] = { y: v.getFullYear(), m: v.getMonth(), value: value || '', cb: cb };
+  opts = opts || {};
+  CAL[id] = { y: v.getFullYear(), m: v.getMonth(), value: value || '', cb: cb, min: opts.min || '', max: opts.max || '' };
   return '<div class="cal" id="cal-' + id + '">' + calInner(id) + '</div>';
 }
 function calInner(id) {
@@ -223,7 +224,8 @@ function calInner(id) {
   for (let i = 0; i < first.getDay(); i++) cells += '<div></div>';
   for (let d = 1; d <= dim; d++) {
     const iso = c.y + '-' + String(c.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    cells += '<button type="button" class="cal-day' + (iso === c.value ? ' sel' : '') + (iso === today ? ' today' : '') + '" onclick="calPick(\'' + id + '\',\'' + iso + '\')">' + d + '</button>';
+    const off = (c.min && iso < c.min) || (c.max && iso > c.max);
+    cells += '<button type="button" class="cal-day' + (iso === c.value ? ' sel' : '') + (iso === today ? ' today' : '') + '"' + (off ? ' disabled' : '') + ' onclick="calPick(\'' + id + '\',\'' + iso + '\')">' + d + '</button>';
   }
   return '<div class="cal-head">' +
     '<button type="button" class="cal-nav" onclick="calNav(\'' + id + '\',-1)">' + icon('left', 18) + '</button>' +
@@ -318,6 +320,8 @@ function switchTab(tab) {
   if (navItem) navItem.classList.add('active');
   document.getElementById('fab').style.display = (tab === 'home' || tab === 'subs') ? 'flex' : 'none';
   render();
+  // A reminder is app-wide, not tied to the Savings tab.
+  checkSavingsReminders();
 }
 
 // ============ RENDER ============
@@ -514,6 +518,25 @@ function renderDecide() {
   }).join('');
 }
 
+function evaluateSubscription(id) {
+  const sub = state.subs.find(s => s.id === id);
+  if (!sub) return;
+  const monthly = monthlyCost(sub), yearly = monthly * 12;
+  const history = sub.priceHistory || [];
+  const increases = history.filter(h => h.reason === 'provider' && Number(h.newPrice) > Number(h.oldPrice));
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `<div class="modal-handle"></div><div class="wizard-question">Evaluate ${esc(sub.name)}</div><p class="modal-copy">Answer honestly. This is a decision aid, not a financial instruction.</p><div class="form-group"><label class="form-label">How often do you use it?</label><select id="eval-usage" class="form-input"><option value="often">Daily or several times a week</option><option value="sometimes">A few times a month</option><option value="rarely">Rarely or never</option></select></div><div class="form-group"><label class="form-label">How important is it?</label><select id="eval-importance" class="form-input"><option value="essential">Essential</option><option value="useful">Useful</option><option value="optional">Optional luxury</option></select></div><div class="form-group"><label class="form-label">Could a cheaper alternative work?</label><select id="eval-alternative" class="form-input"><option value="no">Not really</option><option value="maybe">Possibly</option><option value="yes">Yes</option></select></div><div class="detail-card"><strong>Cost summary</strong><p>${fmt(monthly)} per month · ${fmt(yearly)} per year</p><p>${increases.length ? 'Recorded provider price increases: '+increases.length : 'No provider price increases recorded.'}</p></div><div class="wizard-nav"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="showSubscriptionEvaluation('${sub.id}')">Get evaluation</button></div>`;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function showSubscriptionEvaluation(id) {
+  const sub = state.subs.find(s => s.id === id); if (!sub) return;
+  const usage = document.getElementById('eval-usage').value, importance = document.getElementById('eval-importance').value, alternative = document.getElementById('eval-alternative').value;
+  let score = (usage === 'often' ? 2 : usage === 'sometimes' ? 1 : 0) + (importance === 'essential' ? 2 : importance === 'useful' ? 1 : 0) - (alternative === 'yes' ? 2 : alternative === 'maybe' ? 1 : 0);
+  const verdict = score >= 3 ? 'Worth keeping' : score >= 1 ? 'Review at renewal' : 'Consider cancelling or downgrading';
+  const reason = score >= 3 ? 'You use it regularly or consider it important, with limited alternatives.' : score >= 1 ? 'Its value may justify the cost, but compare usage and alternatives before the next renewal.' : 'Low usage, low importance, or a viable cheaper alternative makes this a strong candidate to cut.';
+  document.getElementById('modal-content').innerHTML = `<div class="modal-handle"></div><div class="wizard-question">${verdict}</div><p class="modal-copy">${reason}</p><div class="detail-card"><strong>${esc(sub.name)}</strong><p>${fmt(monthlyCost(sub))} monthly · ${fmt(monthlyCost(sub)*12)} yearly</p><p>Potential annual saving if cancelled: ${fmt(monthlyCost(sub)*12)} (before any fees or remaining commitments).</p></div><div class="wizard-nav"><button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="openDetail('${sub.id}')">Back to subscription</button></div>`;
+}
+
 function renderInsights() {
   const activeSubs = state.subs.filter(s => s.status === 'active');
   const monthlyTotal = activeSubs.reduce((sum, s) => sum + monthlyCost(s), 0);
@@ -551,6 +574,9 @@ function renderInsights() {
     `;
   }).join('');
 
+  // Subscription evaluator
+  const evaluator = document.getElementById('subscription-evaluator');
+  if (evaluator) evaluator.innerHTML = activeSubs.length ? activeSubs.map(s => `<div class="eval-row"><div><strong>${esc(s.name)}</strong><div class="muted-note">${fmtSubscriptionPrice(s)} · ${esc(s.interval.toLowerCase())}</div></div><button class="btn btn-secondary" onclick="evaluateSubscription('${s.id}')">Evaluate</button></div>`).join('') : '<div class="muted-note">Add an active subscription to evaluate whether it is worth keeping.</div>';
   // Price increases
   const pi = document.getElementById('price-increases');
   const increases = [];
@@ -719,6 +745,7 @@ function openDetail(id) {
   const files = sub.files || [];
   const body = document.getElementById('detail-body');
   body.innerHTML = `
+    <div class="detail-card"><div class="detail-card-title">Subscription evaluation</div><p class="modal-copy">Review how often you use this service and whether its cost is justified.</p><button class="btn btn-primary" onclick="evaluateSubscription('${sub.id}')">Evaluate subscription</button></div>
     <div class="detail-card">
       <div class="detail-card-title">Next Payment</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1556,14 +1583,14 @@ function renderDecideBudget() {
     <div class="wizard-step active">
       <div class="wizard-question">Can you afford it?</div>
       <div class="form-group">
-        <label class="form-label">Available spending budget (optional)</label>
+        <label class="form-label">Money available (optional)</label>
         <input class="form-input" type="number" id="d-budget" placeholder="e.g. 500" value="${decideData.budget || ''}" oninput="decideData.budget=parseFloat(this.value)||null">
       </div>
       <div style="background:var(--bg);border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text2)">
         Your recorded monthly subscriptions: <strong>${fmt(monthlySubs)}</strong>
       </div>
       <div class="option-list" style="margin-bottom:16px">
-        <div class="option-item ${decideData.saved ? 'selected' : ''}" onclick="decideData.saved=!decideData.saved;openDecideModal()">
+        <div class="option-item ${decideData.saved ? 'selected' : ''}" onclick="toggleDecideSaved()">
           I've already saved for this
           <div class="check">${decideData.saved ? icon('check', 14) : ''}</div>
         </div>
@@ -1621,13 +1648,16 @@ function renderDecideResult() {
       ` : ''}
       
       <div class="wizard-nav" style="flex-direction:column">
-        ${waitHours > 0 ? `<button class="btn btn-primary" onclick="startWaiting(${waitHours})">Start ${waitLabel} timer</button>` : ''}
+        ${rec.recommendation_category === 'SAVE_FOR_IT' ? `<button class="btn btn-primary" onclick="saveForPurchase()">Save for it</button>` : ''}
+        ${waitHours > 0 ? `<button class="btn ${rec.recommendation_category === 'SAVE_FOR_IT' ? 'btn-secondary' : 'btn-primary'}" onclick="startWaiting(${waitHours})">Start ${waitLabel} timer</button>` : ''}
         <button class="btn btn-secondary" onclick="markPurchased()">I'll buy it now</button>
         <button class="btn btn-ghost" onclick="markSkipped()">Skip this purchase</button>
       </div>
     </div>
   `;
 }
+
+function toggleDecideSaved(){decideData.saved=!decideData.saved;if(decideData.saved){const name=(decideData.product||'Purchase').trim();if(!state.savingsGoals.some(g=>g.sourceProduct===name)){state.savingsGoals.push({id:uid(),name,amount:Number(decideData.price)||0,mode:'goal',deadline:'',interval:'Weekly',reminderTime:'20:00',created:toISO(new Date()),lastPromptKey:'',sourceProduct:name});saveState();showToast('Added to Savings as a goal');}}else{showToast('Removed from this decision');}openDecideModal()}
 
 function decideNext() {
   // Read the visible fields before validating, avoiding stale input state in HTML viewers.
@@ -1702,7 +1732,7 @@ function generateRecommendation() {
     category = 'INSUFFICIENT_INFORMATION';
     title = 'Not enough information';
     confidence = 'low';
-    reasoning = ['Affordability is uncertain without budget information', 'Consider providing your available spending budget'];
+    reasoning = ['Affordability is uncertain without budget information', 'Consider entering the money available to spend'];
   } else {
     category = 'BUY_IF_AFFORDABLE';
     title = 'Buy if affordable';
@@ -1755,11 +1785,12 @@ function startWaiting(hours) {
     answers: { ...decideData }
   };
   state.assessments.push(assessment);
+  const addedGoal = assessment.recommendation === 'SAVE_FOR_IT' ? ensureSavingsGoalForAssessment(assessment) : null;
   saveState();
   closeModal();
   render();
   switchTab('home');
-  showToast('Timer started · Reassess in ' + (hours >= 24 ? (hours/24) + ' days' : hours + ' hours'));
+  showToast('Timer started · Reassess in ' + (hours >= 24 ? (hours/24) + ' days' : hours + ' hours') + (addedGoal ? ' · Added to Savings' : ''));
 }
 
 function markPurchased() {
@@ -1866,10 +1897,11 @@ function completeAssessment(id, outcome) {
   if (a) {
     a.status = 'done';
     a.outcome = outcome;
+    if (outcome === 'saving') ensureSavingsGoalForAssessment(a);
     saveState();
     closeModal();
     render();
-    showToast('Assessment updated: ' + outcome);
+    showToast(outcome === 'saving' ? 'Added to Savings as a goal' : 'Assessment updated: ' + outcome);
   }
 }
 
@@ -2074,13 +2106,11 @@ function renderSavings() {
     if(g.mode==='habit') guidance=`Target ${fmt(target)} ${String(g.interval||'Weekly').toLowerCase()}`;
     else if(g.deadline){const days=Math.max(1,Math.ceil((parseISO(g.deadline)-new Date())/86400000)); guidance=`Save about ${fmt(Math.max(0,target-saved)/days)} per day · ${fmt(Math.max(0,target-saved)/days*7)} per week · ${fmt(Math.max(0,target-saved)/days*30.4375)} per month`}
     else guidance='Set a deadline to calculate your daily, weekly and monthly target.';
-    return `<article class="savings-goal-card"><div class="savings-goal-top"><div class="goal-symbol">${g.mode==='habit'?'↻':'◎'}</div><div class="savings-goal-title"><strong>${esc(g.name)}</strong><span>${g.mode==='habit'?'Saving habit':'Target goal'}${g.deadline?' · Due '+esc(g.deadline):''}</span></div><button class="text-icon-btn" onclick="openSavingsEntryModal('saved','${g.id}')" aria-label="Record savings">＋</button></div><div class="goal-amount-row"><strong>${fmt(saved)}</strong><span>of ${fmt(target)}</span></div><div class="goal-progress"><span style="width:${pct}%"></span></div><div class="goal-guidance">${guidance}</div><div class="goal-card-actions"><button class="btn btn-secondary" onclick="openSavingsEntryModal('saved','${g.id}')">Add saved</button><button class="btn btn-secondary" onclick="openSavingsEntryModal('spent','${g.id}')">Record spent</button><button class="text-icon-btn danger-text" onclick="deleteSavingsGoal('${g.id}')">${icon('trash',15)}</button></div></article>`;
+    return `<article class="savings-goal-card"><div class="savings-goal-top"><div class="goal-symbol">${g.mode==='habit'?'↻':'◎'}</div><div class="savings-goal-title"><strong>${esc(g.name)}</strong><span>${g.mode==='habit'?'Saving habit':'Target goal'}${g.sourceProduct?' · From Decide':''}${g.deadline?' · Due '+esc(g.deadline):''}</span></div><button class="text-icon-btn" onclick="openSavingsEntryModal('saved','${g.id}')" aria-label="Record savings">＋</button></div><div class="goal-amount-row"><strong>${fmt(saved)}</strong><span>of ${fmt(target)}</span></div><div class="goal-progress"><span style="width:${pct}%"></span></div><div class="goal-guidance">${guidance}</div><div class="goal-card-actions"><button class="btn btn-secondary" onclick="openSavingsEntryModal('saved','${g.id}')">Add saved</button><button class="btn btn-secondary" onclick="openSavingsEntryModal('spent','${g.id}')">Record spent</button><button class="text-icon-btn danger-text" onclick="deleteSavingsGoal('${g.id}')">${icon('trash',15)}</button></div></article>`;
   }).join('') : '<div class="savings-empty"><div class="savings-empty-icon">◎</div><strong>No savings goals yet</strong><p>Create a goal for something you want, or set a regular amount to save.</p></div>';
   const activity=document.getElementById('savings-activity');
   activity.innerHTML=entries.length ? entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8).map(e=>{const g=goals.find(x=>x.id===e.goalId);return `<div class="savings-activity-row"><div class="activity-dot ${e.type}">${e.type==='saved'?'↓':'↑'}</div><div class="activity-copy"><strong>${esc(g?g.name:'General savings')}</strong><span>${esc(e.date)} · ${e.type==='saved'?'Saved':'Spent'}</span></div><strong class="${e.type==='saved'?'saved-text':'spent-text'}">${e.type==='saved'?'+':'−'}${fmt(Number(e.amount))}</strong></div>`}).join(''):'<div class="muted-note">Your saved and spent entries will appear here.</div>';
-  const due=document.getElementById('savings-due');
-  const nowTime=new Date().toTimeString().slice(0,5); const pending=goals.filter(g=>g.lastPromptKey!==savingsDueKey(g) && nowTime >= (g.reminderTime || '20:00')); 
-  due.innerHTML=pending.length?`<div class="savings-checkin"><strong>Quick savings check-in</strong><p>${pending.map(g=>`Did you save ${fmt(Number(g.amount))} ${String(g.interval || 'Weekly').toLowerCase()} for <b>${esc(g.name)}</b>?`).join('<br>')}</p>${pending.map(g=>`<button class="btn btn-primary" onclick="checkSavingsHabit('${g.id}')">Check in · ${esc(g.name)}</button>`).join('')}</div>`:'';
+  const due=document.getElementById('savings-due'); if(due) due.innerHTML=''; // check-ins now appear as a global popup (see checkSavingsReminders)
 }
 let savingsWizard = { step: 0, name: '', mode: 'goal', amount: '', deadline: '', interval: 'Weekly', reminderTime: '20:00' };
 function openSavingsGoalModal(){
@@ -2093,19 +2123,213 @@ function renderSavingsGoalStep(){
  let body='';
  if(w.step===0) body=`<div class="wizard-question">What are you saving for?</div><p class="modal-copy">Give this plan a name and choose the kind of savings goal.</p><div class="form-group"><label class="form-label">Goal name</label><input class="form-input" id="sg-name" placeholder="e.g. New laptop, emergency fund" value="${esc(w.name)}"></div><div class="form-group"><label class="form-label">Plan type</label><div class="option-list"><div class="option-item ${w.mode==='goal'?'selected':''}" onclick="savingsWizard.mode='goal';renderSavingsGoalStep()">Save towards a target <span class="check">${w.mode==='goal'?icon('check',14):''}</span></div><div class="option-item ${w.mode==='habit'?'selected':''}" onclick="savingsWizard.mode='habit';renderSavingsGoalStep()">Save a set amount regularly <span class="check">${w.mode==='habit'?icon('check',14):''}</span></div></div></div>`;
  if(w.step===1) body=`<div class="wizard-question">${w.mode==='goal'?'What is your target amount?':'How much do you want to save each interval?'}</div><p class="modal-copy">Enter the amount in your default currency (${esc(state.settings.currency)}).</p><div class="form-group"><label class="form-label">Amount (${esc(state.settings.currency)})</label><input class="form-input" type="number" min="0.01" step="0.01" id="sg-amount" placeholder="e.g. 500" value="${esc(String(w.amount||''))}"></div>`;
- if(w.step===2) body=`<div class="wizard-question">When do you want to reach it?</div><p class="modal-copy">Choose a target date and Budgit will calculate a daily, weekly and monthly savings pace. You can skip this for now.</p><div class="form-group"><label class="form-label">Target date</label><input class="form-input" type="date" id="sg-deadline" min="${toISO(new Date())}" value="${esc(w.deadline)}"></div><div class="muted-note">A calendar picker opens when you select the date field.</div>`;
- if(w.step===3){const [hh,mm]=w.reminderTime.split(':');body=`<div class="wizard-question">When should Budgit check in?</div><p class="modal-copy">A gentle in-app popup will ask about your progress at the selected interval and time while Budgit is open.</p><div class="form-group"><label class="form-label">Check-in interval</label><div class="option-list">${['Daily','Weekly','Monthly'].map(i=>`<div class="option-item ${w.interval===i?'selected':''}" onclick="savingsWizard.interval='${i}';renderSavingsGoalStep()">${i}<span class="check">${w.interval===i?icon('check',14):''}</span></div>`).join('')}</div></div><div class="form-group"><label class="form-label">Check-in time</label><div class="time-picker"><div class="time-wheel"><label>Hour</label><select id="sg-hour" class="form-input time-wheel-select">${Array.from({length:24},(_,i)=>`<option value="${String(i).padStart(2,'0')}" ${String(i).padStart(2,'0')===hh?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('')}</select></div><span class="time-colon">:</span><div class="time-wheel"><label>Minute</label><select id="sg-minute" class="form-input time-wheel-select">${Array.from({length:12},(_,i)=>{const m=String(i*5).padStart(2,'0');return `<option value="${m}" ${m===mm?'selected':''}>${m}</option>`}).join('')}</select></div></div></div>`;}
+ if(w.step===2) body=`<div class="wizard-question">When do you want to reach it?</div><p class="modal-copy">Choose a target date and Budgit will calculate a daily, weekly and monthly savings pace. You can skip this for now.</p><div class="cal-selected" id="sg-date-label">${w.deadline?esc(fmtDateFull(w.deadline)):'No date chosen'}</div>${calendar('sg-deadline',w.deadline,'setSavingsDeadline',{min:toISO(new Date())})}<button type="button" class="cal-clear" onclick="clearSavingsDeadline()">Skip · no target date</button>`;
+ if(w.step===3){body=`<div class="wizard-question">When should Budgit check in?</div><p class="modal-copy">A popup will appear over whatever you are doing at the selected interval and time, while Budgit is open.</p><div class="form-group"><label class="form-label">Check-in interval</label><div class="option-list">${['Daily','Weekly','Monthly'].map(i=>`<div class="option-item ${w.interval===i?'selected':''}" onclick="savingsWizard.interval='${i}';renderSavingsGoalStep()">${i}<span class="check">${w.interval===i?icon('check',14):''}</span></div>`).join('')}</div></div><div class="form-group"><label class="form-label">Check-in time</label>${clockPickerHTML(w.reminderTime)}</div>`;}
  modal.innerHTML=head+body+`<div class="wizard-nav">${w.step>0?'<button class="btn btn-secondary" onclick="savingsGoalBack()">Back</button>':'<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>'}<button class="btn btn-primary" onclick="savingsGoalNext()">${w.step===3?'Create plan':'Continue'}</button></div>`;
  document.getElementById('modal-overlay').classList.add('show');
+ if(w.step===3) clockDraw();
 }
-function collectSavingsWizardStep(){const w=savingsWizard;if(w.step===0){w.name=document.getElementById('sg-name')?.value.trim()||'';w.mode=w.mode||'goal'}if(w.step===1)w.amount=document.getElementById('sg-amount')?.value||'';if(w.step===2)w.deadline=document.getElementById('sg-deadline')?.value||'';if(w.step===3)w.reminderTime=(document.getElementById('sg-hour')?.value||'20')+':'+(document.getElementById('sg-minute')?.value||'00')}
+function collectSavingsWizardStep(){const w=savingsWizard;if(w.step===0){w.name=document.getElementById('sg-name')?.value.trim()||'';w.mode=w.mode||'goal'}if(w.step===1)w.amount=document.getElementById('sg-amount')?.value||'';}
 function savingsGoalBack(){collectSavingsWizardStep();savingsWizard.step=Math.max(0,savingsWizard.step-1);renderSavingsGoalStep()}
-function savingsGoalNext(){collectSavingsWizardStep();const w=savingsWizard;if(w.step===0&&!w.name){showToast('Give your savings plan a name');return}if(w.step===1&&(!Number.isFinite(Number(w.amount))||Number(w.amount)<=0)){showToast('Enter an amount greater than zero');return}if(w.step===2&&w.deadline&&w.deadline<toISO(new Date())){showToast('Choose a future target date');return}if(w.step<3){w.step++;renderSavingsGoalStep();return}state.savingsGoals.push({id:uid(),name:w.name,amount:Number(w.amount),mode:w.mode,deadline:w.mode==='goal'?w.deadline:'',interval:w.interval,reminderTime:w.reminderTime,created:toISO(new Date()),lastPromptKey:''});saveState();closeModal();renderSavings();showToast('Savings plan created')}
+function savingsGoalNext(){collectSavingsWizardStep();const w=savingsWizard;if(w.step===0&&!w.name){showToast('Give your savings plan a name');return}if(w.step===1&&(!Number.isFinite(Number(w.amount))||Number(w.amount)<=0)){showToast('Enter an amount greater than zero');return}if(w.step===2&&w.deadline&&w.deadline<toISO(new Date())){showToast('Choose a future target date');return}if(w.step<3){w.step++;renderSavingsGoalStep();return}const ng={id:uid(),name:w.name,amount:Number(w.amount),mode:w.mode,deadline:w.mode==='goal'?w.deadline:'',interval:w.interval,reminderTime:w.reminderTime,created:toISO(new Date()),lastPromptKey:''};if(new Date().toTimeString().slice(0,5)>=ng.reminderTime)ng.lastPromptKey=savingsDueKey(ng);state.savingsGoals.push(ng);saveState();closeModal();renderSavings();showToast('Savings plan created')}
 function saveSavingsGoal(){savingsGoalNext()}
-function openSavingsEntryModal(type='saved',goalId='') {const goals=state.savingsGoals||[];document.getElementById('modal-content').innerHTML=`<div class="modal-handle"></div><div class="wizard-question">Record ${type==='saved'?'money saved':'money spent'}</div><div class="form-group"><label class="form-label">Savings plan</label><select class="form-input" id="se-goal"><option value="">General savings (no goal)</option>${goals.map(g=>`<option value="${g.id}" ${g.id===goalId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Entry type</label><select class="form-input" id="se-type"><option value="saved" ${type==='saved'?'selected':''}>Money saved</option><option value="spent" ${type==='spent'?'selected':''}>Money spent from savings</option></select></div><div class="form-group"><label class="form-label">Amount (${esc(state.settings.currency)})</label><input class="form-input" type="number" min="0.01" step="0.01" id="se-amount" placeholder="0.00"></div><div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="se-date" value="${toISO(new Date())}"></div><div class="wizard-nav"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSavingsEntry()">Save entry</button></div>`;document.getElementById('modal-overlay').classList.add('show')}
-function saveSavingsEntry(){const amount=Number(document.getElementById('se-amount').value),goalId=document.getElementById('se-goal').value,type=document.getElementById('se-type').value,date=document.getElementById('se-date').value;if(!Number.isFinite(amount)||amount<=0||!date){showToast('Enter a valid amount and date');return}state.savingsEntries.push({id:uid(),goalId,type,amount,date});saveState();closeModal();renderSavings();showToast(type==='saved'?'Savings recorded':'Spending recorded')}
-function checkSavingsHabit(id){const g=state.savingsGoals.find(x=>x.id===id);if(!g)return;const key=savingsDueKey(g);const yes=confirm(`Did you save ${fmt(Number(g.amount))} ${String(g.interval || 'Weekly').toLowerCase()} for ${g.name}?\nChoose OK for YES, Cancel for NO.`);if(yes){const raw=prompt('How much did you save?',String(g.amount));if(raw===null)return;const amount=Number(raw);if(!Number.isFinite(amount)||amount<0){showToast('Enter a valid amount');return}if(amount>0)state.savingsEntries.push({id:uid(),goalId:id,type:'saved',amount,date:toISO(new Date())})}g.lastPromptKey=key;saveState();renderSavings()}
+function openSavingsEntryModal(type='saved',goalId='') {const goals=state.savingsGoals||[];savingsEntryDate=toISO(new Date());document.getElementById('modal-content').innerHTML=`<div class="modal-handle"></div><div class="wizard-question">Record ${type==='saved'?'money saved':'money spent'}</div><div class="form-group"><label class="form-label">Savings plan</label><select class="form-input" id="se-goal"><option value="">General savings (no goal)</option>${goals.map(g=>`<option value="${g.id}" ${g.id===goalId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Entry type</label><select class="form-input" id="se-type"><option value="saved" ${type==='saved'?'selected':''}>Money saved</option><option value="spent" ${type==='spent'?'selected':''}>Money spent from savings</option></select></div><div class="form-group"><label class="form-label">Amount (${esc(state.settings.currency)})</label><input class="form-input" type="number" min="0.01" step="0.01" id="se-amount" placeholder="0.00"></div><div class="form-group"><label class="form-label">Date</label><button type="button" class="date-field" onclick="toggleEntryCalendar()"><span id="se-date-label">Today</span>${icon('calendar',18)}</button><div class="se-cal-wrap" id="se-cal-wrap" hidden>${calendar('se-date',savingsEntryDate,'setSavingsEntryDate',{max:toISO(new Date())})}</div></div><div class="wizard-nav"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSavingsEntry()">Save entry</button></div>`;document.getElementById('modal-overlay').classList.add('show')}
+function saveSavingsEntry(){const amount=Number(document.getElementById('se-amount').value),goalId=document.getElementById('se-goal').value,type=document.getElementById('se-type').value,date=savingsEntryDate;if(!Number.isFinite(amount)||amount<=0||!date){showToast('Enter a valid amount and date');return}state.savingsEntries.push({id:uid(),goalId,type,amount,date});saveState();closeModal();renderSavings();showToast(type==='saved'?'Savings recorded':'Spending recorded')}
+function checkSavingsHabit(id){openSavingsCheckin(id)}
+
 function deleteSavingsGoal(id){if(!confirm('Delete this savings goal? Its activity history will remain as general activity.'))return;state.savingsGoals=state.savingsGoals.filter(g=>g.id!==id);state.savingsEntries.forEach(e=>{if(e.goalId===id)e.goalId=''});saveState();renderSavings()}
+
+
+// ============ DECIDE -> SAVINGS LINK ============
+// Creates (or finds) the savings goal that belongs to a "Save for it" assessment.
+function ensureSavingsGoalForAssessment(a) {
+  if (!a || !a.product) return null;
+  state.savingsGoals = state.savingsGoals || [];
+  let g = state.savingsGoals.find(x => x.assessmentId === a.id) ||
+          state.savingsGoals.find(x => !x.assessmentId && x.sourceProduct === a.product);
+  if (!g) {
+    g = { id: uid(), name: a.product, amount: Number(a.price) || 0, mode: 'goal', deadline: '', interval: 'Weekly', reminderTime: '20:00', created: toISO(new Date()), lastPromptKey: '', sourceProduct: a.product, assessmentId: a.id };
+    if (new Date().toTimeString().slice(0, 5) >= g.reminderTime) g.lastPromptKey = savingsDueKey(g);
+    state.savingsGoals.push(g);
+  } else if (!g.assessmentId) g.assessmentId = a.id;
+  a.goalCreated = true; // so deleting the goal later does not make it reappear
+  return g;
+}
+// Catches assessments saved before this link existed (e.g. a demo product already marked "Saving").
+function syncAssessmentGoals() {
+  // Reconcile Decide assessments against Savings on every app startup. Older builds
+  // could mark goalCreated=true even when the linked goal was never persisted.
+  let changed = false;
+  (state.assessments || []).forEach(a => {
+    const shouldLink = a.outcome === 'saving' ||
+      (a.status === 'waiting' && a.recommendation === 'SAVE_FOR_IT');
+    if (!shouldLink || !a.product) return;
+    const linked = (state.savingsGoals || []).some(g =>
+      g.assessmentId === a.id ||
+      (!g.assessmentId && String(g.sourceProduct || '').trim().toLowerCase() === String(a.product).trim().toLowerCase())
+    );
+    if (!linked || !a.goalCreated) {
+      ensureSavingsGoalForAssessment(a);
+      changed = true;
+    }
+  });
+  if (changed) saveState();
+}
+function saveForPurchase() {
+  const assessment = {
+    id: uid(), product: decideData.product, price: decideData.price, currency: decideData.currency,
+    status: 'done', outcome: 'saving',
+    recommendation: decideData.recommendation?.recommendation_category || 'SAVE_FOR_IT',
+    recTitle: decideData.recommendation?.recommendation_title || 'Save for this purchase',
+    created: Date.now(), answers: { ...decideData }
+  };
+  state.assessments.push(assessment);
+  ensureSavingsGoalForAssessment(assessment);
+  saveState();
+  closeModal();
+  render();
+  showToast('Added to Savings as a goal');
+}
+
+// ============ SAVINGS: IN-APP DATE PICKERS ============
+let savingsEntryDate = '';
+function setSavingsDeadline(iso) {
+  savingsWizard.deadline = iso;
+  const l = document.getElementById('sg-date-label'); if (l) l.textContent = fmtDateFull(iso);
+}
+function clearSavingsDeadline() { savingsWizard.deadline = ''; renderSavingsGoalStep(); }
+function setSavingsEntryDate(iso) {
+  savingsEntryDate = iso;
+  const l = document.getElementById('se-date-label'); if (l) l.textContent = iso === toISO(new Date()) ? 'Today · ' + fmtDateFull(iso) : fmtDateFull(iso);
+  const w = document.getElementById('se-cal-wrap'); if (w) w.hidden = true;
+}
+function toggleEntryCalendar() {
+  const w = document.getElementById('se-cal-wrap'); if (!w) return;
+  w.hidden = !w.hidden;
+  const l = document.getElementById('se-date-label');
+  if (l && l.textContent === 'Today') l.textContent = 'Today · ' + fmtDateFull(savingsEntryDate);
+}
+
+// ============ IN-APP CLOCK PICKER (no browser time input) ============
+const CLK = { h: 8, m: 0, pm: true, mode: 'hour', dragging: false };
+function clockPickerHTML(time) {
+  const [hh, mm] = (time || '20:00').split(':').map(Number);
+  CLK.pm = hh >= 12; CLK.h = hh % 12 || 12; CLK.m = mm || 0; CLK.mode = 'hour'; CLK.dragging = false;
+  return `<div class="clock-picker" id="clock-picker">
+    <div class="clock-readout">
+      <button type="button" class="clock-seg" id="clk-h" onclick="clockSetMode('hour')"></button>
+      <span class="clock-colon">:</span>
+      <button type="button" class="clock-seg" id="clk-m" onclick="clockSetMode('minute')"></button>
+      <div class="clock-ampm"><button type="button" id="clk-am" onclick="clockSetPeriod(false)">AM</button><button type="button" id="clk-pm" onclick="clockSetPeriod(true)">PM</button></div>
+    </div>
+    <div class="clock-dial" id="clock-dial" onpointerdown="clockPointer(event)" onpointermove="clockPointer(event)" onpointerup="clockPointerUp(event)" onpointercancel="clockPointerUp(event)">
+      <svg viewBox="0 0 240 240" id="clock-svg" role="img" aria-label="Clock face"></svg>
+    </div>
+    <div class="clock-hint" id="clock-hint"></div>
+  </div>`;
+}
+function clockSetMode(mode) { CLK.mode = mode; clockDraw(); }
+function clockSetPeriod(pm) { CLK.pm = pm; clockDraw(); }
+function clockDraw() {
+  const hEl = document.getElementById('clk-h'); if (!hEl) return;
+  const p2 = n => String(n).padStart(2, '0'), hour = CLK.mode === 'hour';
+  hEl.textContent = p2(CLK.h); document.getElementById('clk-m').textContent = p2(CLK.m);
+  hEl.classList.toggle('active', hour); document.getElementById('clk-m').classList.toggle('active', !hour);
+  document.getElementById('clk-am').classList.toggle('active', !CLK.pm); document.getElementById('clk-pm').classList.toggle('active', CLK.pm);
+  document.getElementById('clock-hint').textContent = hour ? 'Tap or drag to choose the hour' : 'Tap or drag to choose the minute';
+  const R = 92, pos = (a, r) => [120 + r * Math.sin(a * Math.PI / 180), 120 - r * Math.cos(a * Math.PI / 180)];
+  const ang = hour ? (CLK.h % 12) * 30 : CLK.m * 6, [sx, sy] = pos(ang, R);
+  let svg = '<circle class="clock-face" cx="120" cy="120" r="116"/>';
+  svg += `<line class="clock-hand" x1="120" y1="120" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}"/><circle class="clock-center" cx="120" cy="120" r="4"/><circle class="clock-sel" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="19"/>`;
+  const off5 = !hour && CLK.m % 5 !== 0;
+  for (let i = 0; i < 12; i++) {
+    const v = hour ? (i === 0 ? 12 : i) : i * 5, a = hour ? (v % 12) * 30 : v * 6;
+    const diff = Math.abs(((a - ang + 540) % 360) - 180);
+    if (off5 && diff < 20) continue; // hidden under the selection bubble
+    const [x, y] = pos(a, R), on = hour ? v === CLK.h : v === CLK.m;
+    svg += `<text class="clock-num${on ? ' on' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${hour ? v : p2(v)}</text>`;
+  }
+  if (off5) svg += `<text class="clock-num on" x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${p2(CLK.m)}</text>`;
+  document.getElementById('clock-svg').innerHTML = svg;
+  savingsWizard.reminderTime = p2((CLK.h % 12) + (CLK.pm ? 12 : 0)) + ':' + p2(CLK.m);
+}
+function clockPointer(e) {
+  if (e.type === 'pointerdown') { CLK.dragging = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} }
+  if (!CLK.dragging) return;
+  e.preventDefault();
+  const r = e.currentTarget.getBoundingClientRect();
+  let a = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+  if (a < 0) a += 360;
+  if (CLK.mode === 'hour') CLK.h = Math.round(a / 30) % 12 || 12; else CLK.m = Math.round(a / 6) % 60;
+  clockDraw();
+}
+function clockPointerUp() {
+  if (!CLK.dragging) return;
+  CLK.dragging = false;
+  if (CLK.mode === 'hour') { CLK.mode = 'minute'; clockDraw(); } // hour chosen -> go straight to minutes
+}
+
+// ============ GLOBAL SAVINGS CHECK-IN POPUP ============
+// Roughly how much should be saved per interval for this plan (0 = no fixed pace).
+function savingsPaceAmount(g) {
+  if (g.mode === 'habit') return Number(g.amount) || 0;
+  if (g.deadline) {
+    const remaining = Math.max(0, Number(g.amount) - savingsGoalTotal(g));
+    const days = Math.max(1, Math.ceil((parseISO(g.deadline) - new Date()) / 86400000));
+    const perInterval = { Daily: 1, Weekly: 7, Monthly: 30.4375 }[g.interval || 'Weekly'] || 7;
+    return Math.round(Math.min(remaining, remaining / days * perInterval) * 100) / 100;
+  }
+  return 0;
+}
+function pendingSavingsCheckins() {
+  const now = new Date(), nowTime = now.toTimeString().slice(0, 5), ts = now.getTime();
+  return (state.savingsGoals || []).filter(g =>
+    g.lastPromptKey !== savingsDueKey(g) && nowTime >= (g.reminderTime || '20:00') &&
+    !(g.snoozeUntil && ts < g.snoozeUntil) &&
+    (g.mode === 'habit' || savingsGoalTotal(g) < Number(g.amount || 0)));
+}
+function checkSavingsReminders() {
+  const ov = document.getElementById('checkin-overlay');
+  if (!ov || ov.classList.contains('show')) return;
+  const due = pendingSavingsCheckins()[0];
+  if (due) openSavingsCheckin(due.id);
+}
+function openSavingsCheckin(id) {
+  const g = (state.savingsGoals || []).find(x => x.id === id); if (!g) return;
+  const pace = savingsPaceAmount(g), every = String(g.interval || 'Weekly');
+  const when = every === 'Daily' ? 'today' : every === 'Weekly' ? 'this week' : 'this month';
+  const q = pace > 0 ? `Did you save ${fmt(pace)} ${when} for <b>${esc(g.name)}</b>?` : `Did you put anything aside ${when} for <b>${esc(g.name)}</b>?`;
+  document.getElementById('checkin-card').innerHTML = `
+    <div class="checkin-badge">Savings check-in</div>
+    <div class="goal-symbol checkin-symbol">${g.mode === 'habit' ? '↻' : '◎'}</div>
+    <div class="wizard-question">Time to check in</div>
+    <p class="modal-copy">${q}</p>
+    <div class="form-group" style="text-align:left"><label class="form-label">How much did you save? (${esc(state.settings.currency)})</label>
+      <input class="form-input" id="checkin-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="${pace > 0 ? pace : ''}"></div>
+    <div class="checkin-actions">
+      <button class="btn btn-secondary" onclick="finishSavingsCheckin('${g.id}',false)">Not this time</button>
+      <button class="btn btn-primary" onclick="finishSavingsCheckin('${g.id}',true)">Record savings</button>
+    </div>
+    <button class="checkin-later" onclick="snoozeSavingsCheckin('${g.id}')">Remind me in 10 minutes</button>`;
+  document.getElementById('checkin-overlay').classList.add('show');
+}
+function closeSavingsCheckin() { document.getElementById('checkin-overlay').classList.remove('show'); }
+function finishSavingsCheckin(id, saved) {
+  const g = (state.savingsGoals || []).find(x => x.id === id);
+  if (!g) { closeSavingsCheckin(); return; }
+  const amount = Number(document.getElementById('checkin-amount')?.value || 0);
+  if (saved && (!Number.isFinite(amount) || amount <= 0)) { showToast('Enter the amount you saved'); return; }
+  if (saved) state.savingsEntries.push({ id: uid(), goalId: id, type: 'saved', amount, date: toISO(new Date()) });
+  g.lastPromptKey = savingsDueKey(g); delete g.snoozeUntil;
+  saveState(); closeSavingsCheckin(); renderSavings();
+  showToast(saved ? 'Savings recorded' : 'Check-in completed');
+  setTimeout(checkSavingsReminders, 450); // another plan may be due too
+}
+function snoozeSavingsCheckin(id) {
+  const g = (state.savingsGoals || []).find(x => x.id === id);
+  if (g) { g.snoozeUntil = Date.now() + 10 * 60000; saveState(); }
+  closeSavingsCheckin(); showToast('Okay, I will remind you in 10 minutes');
+}
 
 // ============ SETTINGS ============
 function toggleDark() {
@@ -2190,12 +2414,16 @@ function init() {
   if (state.settings.dark) {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
+  syncAssessmentGoals();
   render();
 }
 
 init();
 // In-app reminder checks run while Budgit is open; browsers do not run this timer after the tab is closed.
-setInterval(() => { if (currentTab === 'savings') { const due=(state.savingsGoals||[]).find(g=>g.lastPromptKey!==savingsDueKey(g) && new Date().toTimeString().slice(0,5)>=(g.reminderTime||'20:00'));  if(due) checkSavingsHabit(due.id); } }, 60000);
+setInterval(checkSavingsReminders, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkSavingsReminders(); });
+window.addEventListener('focus', checkSavingsReminders);
+setTimeout(checkSavingsReminders, 1200);
 
 // Load exchange rates for mixed-currency subscriptions without blocking the interface.
 window.addEventListener('load', () => refreshExchangeRates());
